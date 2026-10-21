@@ -15,3 +15,6 @@
 .task-form .submit-button{width:100%}
 .task-form-note{font-size:10px;line-height:1.6;color:#829087;margin:12px 0 0}
 @media(max-width:540px){.section-actions{gap:8px}.post-task-button{padding:0 10px;font-size:10px}.task-form{padding:16px}.task-form-row{grid-template-columns:1fr;gap:0}}
+
+.forgot-password{align-self:flex-end;border:0;background:transparent;color:#276447;font-size:11px;font-weight:700;padding:0;margin:-8px 0 16px;text-decoration:underline;text-underline-offset:3px}
+.forgot-password:disabled{opacity:.65;cursor:wait}
