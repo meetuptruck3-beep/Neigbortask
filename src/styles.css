@@ -18,3 +18,17 @@
 
 .forgot-password{align-self:flex-end;border:0;background:transparent;color:#B45F83;font-size:11px;font-weight:700;padding:0;margin:-8px 0 16px;text-decoration:underline;text-underline-offset:3px}
 .forgot-password:disabled{opacity:.65;cursor:wait}
+
+.offers-section{padding:30px 0 10px;border-bottom:1px solid #F3E1E9}
+.offer-list{display:grid;gap:10px}
+.offer-card{display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:1px solid #D9EAF3;border-radius:13px;box-shadow:0 5px 18px #477C9508}
+.offer-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:12px;background:#E4F5FC;color:#477C95;font-size:20px}
+.offer-content{flex:1;min-width:0}
+.offer-content>strong{font-family:Manrope,sans-serif;font-size:13px;color:#294553}
+.offer-content p{font-size:12px;line-height:1.5;color:#718078;margin:5px 0 7px}
+.offer-status{display:inline-flex;border-radius:20px;padding:4px 8px;font-size:10px;font-weight:700;background:#FCEBF2;color:#B45F83}
+.offer-status-accepted{background:#E4F5FC;color:#477C95}
+.offer-status-rejected,.offer-status-withdrawn{background:#F2F3F4;color:#75818A}
+.offer-date{font-size:10px;color:#82919A;white-space:nowrap;align-self:flex-start}
+.empty-offers{padding:20px;background:#fff;border:1px dashed #D9EAF3;border-radius:12px;font-size:12px;line-height:1.6;color:#82919A}
+@media(max-width:540px){.offer-card{align-items:flex-start;gap:10px;padding:12px}.offer-icon{width:34px;height:34px;font-size:17px}.offer-date{font-size:9px}.offers-section .section-heading{align-items:flex-start;gap:10px}.offers-section .section-actions{flex-wrap:wrap;justify-content:flex-end}}
