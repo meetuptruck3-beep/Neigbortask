@@ -75,7 +75,10 @@ export default function App() {
         const { data, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { display_name: name.trim(), role } },
+          options: {
+            data: { display_name: name.trim(), role },
+            emailRedirectTo: window.location.origin,
+          },
         });
         if (authError) throw authError;
         if (data.session) setNotice("Your account is ready. Welcome to Neighbortask.");
