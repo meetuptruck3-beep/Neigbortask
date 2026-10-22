@@ -19,7 +19,12 @@ export default function App() {
   const [error, setError] = useState("");
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [jobs, setJobs] = useState([]);\n  const [jobSearch, setJobSearch] = useState("");\n  const [jobCategoryFilter, setJobCategoryFilter] = useState("All");\n  const [jobLocationFilter, setJobLocationFilter] = useState("");\n  const [minBudgetFilter, setMinBudgetFilter] = useState("");\n  const [maxBudgetFilter, setMaxBudgetFilter] = useState("");
+  const [jobs, setJobs] = useState([]);
+  const [jobSearch, setJobSearch] = useState("");
+  const [jobCategoryFilter, setJobCategoryFilter] = useState("All");
+  const [jobLocationFilter, setJobLocationFilter] = useState("");
+  const [minBudgetFilter, setMinBudgetFilter] = useState("");
+  const [maxBudgetFilter, setMaxBudgetFilter] = useState("");
   const [offers, setOffers] = useState([]);
   const [showOffers, setShowOffers] = useState(true);
   const [appliedJobIds, setAppliedJobIds] = useState([]);
