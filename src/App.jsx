@@ -78,9 +78,25 @@ export default function App() {
       else setAppliedJobIds((applications || []).map((application) => application.job_id));
     } else setAppliedJobIds([]);
     setLoadingJobs(true);
-    const { data, error: jobsError } = await supabase.from("jobs").select("id,title,description,category,location,budget,created_at")
-      .eq("status", "open").order("created_at", { ascending: false }).limit(20);
-    if (!jobsError) setJobs(data || []);
+    // Load every open task in pages instead of limiting the task feed to the newest 20.
+    // Paging avoids the API's per-request row cap while keeping search/filter results comprehensive.
+    const allOpenJobs = [];
+    const pageSize = 1000;
+    let jobsError = null;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: jobPage, error: pageError } = await supabase.from("jobs")
+        .select("id,title,description,category,location,budget,created_at")
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (pageError) {
+        jobsError = pageError;
+        break;
+      }
+      allOpenJobs.push(...(jobPage || []));
+      if (!jobPage || jobPage.length < pageSize) break;
+    }
+    if (!jobsError) setJobs(allOpenJobs);
     else setError((current) => current ? current + " " + jobsError.message : "Could not load open tasks. " + jobsError.message);
     const { data: myTasks, error: myTasksError } = await supabase
       .from("jobs").select("id,title").eq("customer_id", user.id);
