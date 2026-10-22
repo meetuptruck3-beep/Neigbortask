@@ -45,6 +45,7 @@ export default function App() {
   const [profileStats, setProfileStats] = useState({});
   const [accountReviews, setAccountReviews] = useState([]);
   const [reviewDrafts, setReviewDrafts] = useState({});
+  const [providerAcceptedTasks, setProviderAcceptedTasks] = useState([]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -87,9 +88,19 @@ export default function App() {
     setProfileStats(Object.fromEntries((statsData || []).map((item) => [item.profile_id, item])));
     if (["provider", "both"].includes(activeProfile.role)) {
       const { data: applications, error: applicationsError } = await supabase
-        .from("job_applications").select("job_id").eq("provider_id", user.id);
+        .from("job_applications").select("job_id,status").eq("provider_id", user.id);
       if (applicationsError) setError("Could not load your applications. " + applicationsError.message);
-      else setAppliedJobIds((applications || []).map((application) => application.job_id));
+      else {
+        setAppliedJobIds((applications || []).map((application) => application.job_id));
+        const acceptedIds = (applications || []).filter((application) => application.status === "accepted").map((application) => application.job_id);
+        if (acceptedIds.length) {
+          const { data: acceptedJobs } = await supabase.from("jobs").select("id,title,customer_id").in("id", acceptedIds);
+          const customerIds = [...new Set((acceptedJobs || []).map((job) => job.customer_id))];
+          const { data: customerProfiles } = customerIds.length ? await supabase.from("profiles").select("id,display_name").in("id", customerIds) : { data: [] };
+          const customerNames = Object.fromEntries((customerProfiles || []).map((person) => [person.id, person.display_name || "A neighbor"]));
+          setProviderAcceptedTasks((acceptedJobs || []).map((job) => ({ ...job, customerName: customerNames[job.customer_id] || "A neighbor" })));
+        } else setProviderAcceptedTasks([]);
+      }
     } else setAppliedJobIds([]);
     setLoadingJobs(true);
     // Load every open task in pages instead of limiting the task feed to the newest 20.
@@ -370,6 +381,16 @@ export default function App() {
     <div><strong>{profileStats[session.user.id]?.jobs_completed ?? 0}</strong><span>Jobs completed as a provider</span></div>
     <div><strong>{profileStats[session.user.id]?.jobs_paid ?? 0}</strong><span>Jobs paid for</span></div>
   </div>
+</section>
+<section className="provider-reviews-section">
+  <div className="section-heading"><div><p className="eyebrow">YOUR ACCEPTED TASKS</p><h2>Rate task posters</h2></div></div>
+  {providerAcceptedTasks.length ? <div className="provider-review-list">{providerAcceptedTasks.map((task)=>{
+    const alreadyReviewed=accountReviews.some((review)=>review.job_id===task.id && review.reviewer_id===session.user.id);
+    const key=task.id+":"+task.customer_id;
+    return <article className="provider-review-card" key={task.id}><div><strong>{task.title}</strong><p>Task posted by {task.customerName}</p></div>
+      {alreadyReviewed ? <span className="offer-status offer-status-accepted">Rating submitted</span> : <div className="review-controls"><label htmlFor={"provider-review-rating-"+task.id}>Rate your experience</label><select id={"provider-review-rating-"+task.id} value={reviewDrafts[key]?.rating || "5"} onChange={(e)=>setReviewDrafts((current)=>({...current,[key]:{...(current[key]||{}),rating:e.target.value}}))}><option value="5">★★★★★ — Excellent</option><option value="4">★★★★☆ — Good</option><option value="3">★★★☆☆ — Okay</option><option value="2">★★☆☆☆ — Poor</option><option value="1">★☆☆☆☆ — Very poor</option></select><textarea rows={2} maxLength={1000} placeholder="Share your experience (optional)" value={reviewDrafts[key]?.text || ""} onChange={(e)=>setReviewDrafts((current)=>({...current,[key]:{...(current[key]||{}),text:e.target.value}}))}/><button className="button button-outline small" onClick={()=>submitReview(task.id,task.customer_id)}>Submit rating</button></div>}
+    </article>;
+  })}</div> : <div className="empty-offers">When a task poster accepts one of your proposals, you can rate your experience here.</div>}
 </section>
 <section className="community-section">
   <div className="section-heading"><div><p className="eyebrow">MEET YOUR NEIGHBORS</p><h2>Community profiles & ratings</h2></div><span className="count">{communityProfiles.length}</span></div>
