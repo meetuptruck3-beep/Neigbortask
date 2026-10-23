@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import StripeConnectDemo from "./StripeConnectDemo.jsx";
 import "./styles.css";
 
 class AppErrorBoundary extends React.Component {
@@ -50,7 +51,7 @@ const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     React.createElement(AppErrorBoundary, null,
-      React.createElement(React.StrictMode, null, React.createElement(App))
+      React.createElement(React.StrictMode, null, React.createElement(new URLSearchParams(window.location.search).get("stripe-demo") === "1" ? StripeConnectDemo : App))
     )
   );
 } else {
