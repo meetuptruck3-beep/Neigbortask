@@ -67,6 +67,8 @@ export default async function handler(req, res) {
       const accountId = String(req.body?.accountId || "");
       const productId = String(req.body?.productId || "");
       if (!/^acct_[A-Za-z0-9]+$/.test(accountId) || !/^prod_[A-Za-z0-9]+$/.test(productId)) return out(res, 400, { error: "Valid connected account and product IDs are required." });
+      const accountState = await client.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant"] });
+      if (accountState.configuration?.merchant?.capabilities?.card_payments?.status !== "active") return out(res, 409, { error: "This seller is not yet enabled to accept card payments. Ask the seller to finish Stripe onboarding." });
       const product = await client.products.retrieve(productId, { expand: ["default_price"] }, { stripeAccount: accountId });
       const price = product.default_price;
       if (!product.active || !price || typeof price !== "object" || !price.active || !Number.isInteger(price.unit_amount)) return out(res, 400, { error: "This product is not available for purchase." });
