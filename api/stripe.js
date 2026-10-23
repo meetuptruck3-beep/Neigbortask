@@ -62,6 +62,26 @@ export default async function handler(req, res) {
       const result = await client.products.list({ limit: 20, active: true, expand: ["data.default_price"] }, { stripeAccount: accountId });
       return out(res, 200, { products: result.data });
     }
+    // Public storefront checkout does not require a buyer account; product/price are validated with Stripe.
+    if (req.method === "POST" && action === "checkout") {
+      const accountId = String(req.body?.accountId || "");
+      const productId = String(req.body?.productId || "");
+      if (!/^acct_[A-Za-z0-9]+$/.test(accountId) || !/^prod_[A-Za-z0-9]+$/.test(productId)) return out(res, 400, { error: "Valid connected account and product IDs are required." });
+      const product = await client.products.retrieve(productId, { expand: ["default_price"] }, { stripeAccount: accountId });
+      const price = product.default_price;
+      if (!product.active || !price || typeof price !== "object" || !price.active || !Number.isInteger(price.unit_amount)) return out(res, 400, { error: "This product is not available for purchase." });
+      const pct = Number(process.env.STRIPE_APPLICATION_FEE_PERCENT || "10");
+      if (!Number.isFinite(pct) || pct < 0 || pct > 25) return out(res, 503, { error: "STRIPE_APPLICATION_FEE_PERCENT must be between 0 and 25." });
+      const fee = Math.floor(price.unit_amount * pct / 100);
+      const base = root(req);
+      const session = await client.checkout.sessions.create({
+        line_items: [{ price: price.id, quantity: 1 }], payment_intent_data: { application_fee_amount: fee },
+        mode: "payment",
+        success_url: base + "/?stripe-demo=1&checkout=success&session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: base + "/?stripe-demo=1&checkout=cancelled"
+      }, { stripeAccount: accountId });
+      return out(res, 200, { url: session.url });
+    }
     const { user, supabase } = await signedIn(req);
     if (req.method === "GET" && action === "status") {
       const accountId = await mapped(supabase, user.id);
@@ -108,27 +128,6 @@ export default async function handler(req, res) {
       if (!/^[a-z]{3}$/.test(currency)) return out(res, 400, { error: "Currency must be a 3-letter code such as usd." });
       const product = await client.products.create({ name, ...(description ? { description } : {}), default_price_data: { unit_amount: priceInCents, currency } }, { stripeAccount: accountId });
       return out(res, 201, { product });
-    }
-    if (action === "checkout") {
-      const accountId = String(req.body?.accountId || "");
-      const productId = String(req.body?.productId || "");
-      if (!/^acct_[A-Za-z0-9]+$/.test(accountId) || !/^prod_[A-Za-z0-9]+$/.test(productId)) return out(res, 400, { error: "Valid connected account and product IDs are required." });
-      // Resolve the product and price from Stripe; never accept price or fee amounts from the browser.
-      const product = await client.products.retrieve(productId, { expand: ["default_price"] }, { stripeAccount: accountId });
-      const price = product.default_price;
-      if (!product.active || !price || typeof price !== "object" || !price.active || !Number.isInteger(price.unit_amount)) return out(res, 400, { error: "This product is not available for purchase." });
-      const pct = Number(process.env.STRIPE_APPLICATION_FEE_PERCENT || "10");
-      if (!Number.isFinite(pct) || pct < 0 || pct > 25) return out(res, 503, { error: "STRIPE_APPLICATION_FEE_PERCENT must be between 0 and 25." });
-      const fee = Math.floor(price.unit_amount * pct / 100);
-      const base = root(req);
-      // Direct charge: Checkout runs on the connected account, with an application fee routed to the platform.
-      const session = await client.checkout.sessions.create({
-        line_items: [{ price: price.id, quantity: 1 }], payment_intent_data: { application_fee_amount: fee },
-        mode: "payment",
-        success_url: base + "/?stripe-demo=1&checkout=success&session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: base + "/?stripe-demo=1&checkout=cancelled"
-      }, { stripeAccount: accountId });
-      return out(res, 200, { url: session.url });
     }
     if (action === "subscription-checkout") {
       const accountId = await mapped(supabase, user.id);
