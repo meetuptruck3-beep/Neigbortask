@@ -144,7 +144,7 @@ export default function StripeConnectDemo() {
               <h3 style={{ margin: "0 0 6px" }}>{p.name}</h3>
               {p.description && <p style={{ margin: "0 0 10px", color: "#5b6e7b" }}>{p.description}</p>}
               <strong>{money(p.default_price)}</strong>
-              <div><button style={{ ...button, marginTop: 10 }} disabled={!session || !!busy || !status?.readyToProcessPayments} onClick={() => run("checkout-" + p.id, "checkout", "POST", { accountId: storeAccountId, productId: p.id })}>Buy with Stripe Checkout</button></div>
+              <div><button style={{ ...button, marginTop: 10 }} disabled={!!busy} onClick={() => run("checkout-" + p.id, "checkout", "POST", { accountId: storeAccountId, productId: p.id })}>Buy with Stripe Checkout</button></div>
             </article>)}
             {products.length === 0 && <p style={{ color: "#6c7e89" }}>No products loaded yet. Load a storefront above after a seller creates a product.</p>}
           </div>
