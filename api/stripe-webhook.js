@@ -70,6 +70,40 @@ export default async function handler(req, res) {
 
     const db = adminDb();
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        const metadata = session.metadata || {};
+        if (metadata.handyneighbor_task_payment === "true" && session.payment_status === "paid") {
+          const taskId = metadata.task_id;
+          const customerId = metadata.customer_id;
+          const applicationId = metadata.application_id;
+          if (!taskId || !customerId || !applicationId) {
+            console.warn("Task checkout completed without required metadata", session.id);
+            break;
+          }
+          const { data: application, error: applicationError } = await db
+            .from("job_applications")
+            .select("id,job_id,provider_id,status")
+            .eq("id", applicationId)
+            .eq("job_id", taskId)
+            .eq("provider_id", metadata.provider_id)
+            .maybeSingle();
+          if (applicationError) throw new Error("Could not verify the task application for completed checkout.");
+          if (!application || application.status !== "accepted") {
+            console.warn("Ignoring completed task checkout for an offer that is no longer accepted", session.id);
+            break;
+          }
+          const { error: paidError } = await db
+            .from("jobs")
+            .update({ paid_at: new Date().toISOString() })
+            .eq("id", taskId)
+            .eq("customer_id", customerId)
+            .is("paid_at", null);
+          if (paidError) throw new Error("Could not record completed task checkout.");
+          console.info("HandyNeighbor task payment recorded", { sessionId: session.id, taskId });
+        }
+        break;
+      }
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const s = event.data.object;
