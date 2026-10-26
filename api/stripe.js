@@ -85,6 +85,65 @@ export default async function handler(req, res) {
       return out(res, 200, { url: session.url });
     }
     const { user, supabase } = await signedIn(req);
+    if (req.method === "POST" && action === "task-checkout") {
+      const { user, supabase } = await signedIn(req);
+      const applicationId = String(req.body?.applicationId || "");
+      if (!applicationId || applicationId.length > 100) return out(res, 400, { error: "A valid accepted task offer is required." });
+
+      const { data: application, error: applicationError } = await supabase
+        .from("job_applications")
+        .select("id,job_id,provider_id,status,proposed_amount")
+        .eq("id", applicationId)
+        .maybeSingle();
+      if (applicationError) throw new Error("Could not load the task offer.");
+      if (!application || application.status !== "accepted") return out(res, 409, { error: "Only an accepted task offer can be paid." });
+
+      const { data: job, error: jobError } = await supabase
+        .from("jobs")
+        .select("id,title,customer_id,completed_at,paid_at")
+        .eq("id", application.job_id)
+        .eq("customer_id", user.id)
+        .maybeSingle();
+      if (jobError) throw new Error("Could not verify the task owner.");
+      if (!job) return out(res, 404, { error: "This task was not found for your account." });
+      if (!job.completed_at) return out(res, 409, { error: "Mark the task completed before paying." });
+      if (job.paid_at) return out(res, 409, { error: "This task is already marked as paid." });
+
+      const amount = Number(application.proposed_amount);
+      if (!Number.isFinite(amount) || Math.round(amount * 100) < 50 || Math.round(amount * 100) > 100000000) {
+        return out(res, 400, { error: "The accepted offer must be between $0.50 and $1,000,000.00 to use card checkout." });
+      }
+      const accountId = await mapped(supabase, application.provider_id);
+      if (!accountId) return out(res, 409, { error: "The service provider has not connected Stripe payments yet." });
+      const accountState = await client.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant"] });
+      if (accountState.configuration?.merchant?.capabilities?.card_payments?.status !== "active") {
+        return out(res, 409, { error: "The service provider is not yet enabled to accept card payments." });
+      }
+      const pct = Number(process.env.STRIPE_APPLICATION_FEE_PERCENT || "10");
+      if (!Number.isFinite(pct) || pct < 0 || pct > 25) return out(res, 503, { error: "STRIPE_APPLICATION_FEE_PERCENT must be between 0 and 25." });
+      const amountInCents = Math.round(amount * 100);
+      const fee = Math.floor(amountInCents * pct / 100);
+      const base = root(req);
+      const session = await client.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            unit_amount: amountInCents,
+            product_data: { name: String(job.title || "HandyNeighbor task").slice(0, 120), description: "Payment for a completed HandyNeighbor task" }
+          },
+          quantity: 1
+        }],
+        payment_intent_data: {
+          application_fee_amount: fee,
+          metadata: { handyneighbor_task_payment: "true", task_id: job.id, application_id: application.id, customer_id: user.id, provider_id: application.provider_id }
+        },
+        metadata: { handyneighbor_task_payment: "true", task_id: job.id, application_id: application.id, customer_id: user.id, provider_id: application.provider_id },
+        success_url: base + "/?checkout=success",
+        cancel_url: base + "/?checkout=cancelled"
+      }, { stripeAccount: accountId });
+      return out(res, 200, { url: session.url });
+    }
     if (req.method === "GET" && action === "status") {
       const accountId = await mapped(supabase, user.id);
       return out(res, 200, accountId ? await liveStatus(client, accountId) : { accountId: null, onboardingComplete: false, readyToProcessPayments: false });
